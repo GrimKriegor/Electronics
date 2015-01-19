@@ -18,22 +18,26 @@
 #include <MIDI.h>
 
 //Configure sender pin
-int SENDERPIN = 2;
+#define SENDERPIN 2
+
+//Configure sensitivity
+#define SENSITIVITY 200
+
+//Configure MIDI Notes
+const int lemon1_note = 0x24; //Drum Kick
+const int lemon2_note = 0x26; //Rock Snare
+const int lemon3_note = 0x31; //Crash
+
+//MIDI codes, velocity, and noteON
+const int ON = 0x14;
+const int OFF = 0x00;
+const int noteON = 0x90;
 
 //Define sensor objects
 CapacitiveSensor lemon1 = CapacitiveSensor(SENDERPIN, 3);
 CapacitiveSensor lemon2 = CapacitiveSensor(SENDERPIN, 4);
 CapacitiveSensor lemon3 = CapacitiveSensor(SENDERPIN, 5);
 
-//Configure MIDI Notes
-int lemon1_note = 0x24; //Drum Kick
-int lemon2_note = 0x26; //Rock Snare
-int lemon3_note = 0x31; //Crash
-
-//Velocity
-int ON = 0x14;
-int OFF = 0x00;
-int noteON = 0x90;
 
 //Function to send MIDI message
 void MIDImessage(int command, int note, int velocity) {
@@ -61,28 +65,28 @@ void loop()
 	//Check LEMON1
 	static int lastInput1 = 0;
 	int newInput1 = total1;
-	if((lastInput1 < 500) && (newInput1 > 500)) {
-		MIDImessage(0x90, lemon1_note, ON); };
-	if((lastInput1 > 500) && (newInput1 < 500)) {
-		MIDImessage(0x90, lemon1_note, OFF); };
+	if((lastInput1 < SENSITIVITY) && (newInput1 > SENSITIVITY)) {
+		MIDImessage(noteON, lemon1_note, ON); };
+	if((lastInput1 > SENSITIVITY) && (newInput1 < SENSITIVITY)) {
+		MIDImessage(noteON, lemon1_note, OFF); };
 	lastInput1 = newInput1;
 		
 	//Check LEMON2
 	static int lastInput2 = 0;
 	int newInput2 = total2;
-	if((lastInput2 < 500) && (newInput2 > 500)) {
-		MIDImessage(0x90, lemon2_note, ON); };
-	if((lastInput2 > 500) && (newInput2 < 500)) {
-		MIDImessage(0x90, lemon2_note, OFF); };
+	if((lastInput2 < SENSITIVITY) && (newInput2 > SENSITIVITY)) {
+		MIDImessage(noteON, lemon2_note, ON); };
+	if((lastInput2 > SENSITIVITY) && (newInput2 < SENSITIVITY)) {
+		MIDImessage(noteON, lemon2_note, OFF); };
 	lastInput2 = newInput2;
 		
 	//Check LEMON3
 	static int lastInput3 = 0;
 	int newInput3 = total3;
-	if((lastInput3 < 500) && (newInput3 > 500)) {
-		MIDImessage(0x90, lemon3_note, ON); };
-	if((lastInput3 > 500) && (newInput3 < 500)) {
-		MIDImessage(0x90, lemon3_note, OFF); };
+	if((lastInput3 < SENSITIVITY) && (newInput3 > SENSITIVITY)) {
+		MIDImessage(noteON, lemon3_note, ON); };
+	if((lastInput3 > SENSITIVITY) && (newInput3 < SENSITIVITY)) {
+		MIDImessage(noteON, lemon3_note, OFF); };
 	lastInput3 = newInput3;
 	
 }
