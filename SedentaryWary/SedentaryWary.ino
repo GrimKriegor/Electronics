@@ -22,24 +22,24 @@
 
 
 //Configure
+const long INTENSITY_THRESHOLD = 200; // Level of activity to be considered as moderate to vigorous
+const int MAX_SITTING_TIME = 30; // Number of minutes the program will wait before setting off the alarm
 const byte LED_PIN = 3; // Info LED pin
 const byte BUZZER_PIN = 11; // Info Buzzer pin
 const byte BUTTON_PIN = 2; // Button pin
-const long INTENSITY_THRESHOLD = 300; // Level of activity to be considered as moderate to vigorous
-const int MAX_SITTING_TIME = 1; // Number of minutes the program will wait before setting off the alarm
 
 
 //Declare variables
-long MAX_SITTING_TIME_SECS = MAX_SITTING_TIME * 60;
-int INTENSITY;
-int SETTING;
-byte READING_NUMBER;
-int ACTIVITY_ARRAY[23];
+int INTENSITY; //Intensity is the "mean" of acceleration from the 3 axis
+int SETTING; //This variable selectively enables the appropriate block during loop(), depending on the current state
+byte READING_NUMBER; //Index number of each reading
+int ACTIVITY_ARRAY[23]; //This array will store all the activity readings during the Walking setting
 const int MPU=0x68;  // I2C address of the MPU-6050
 long AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
 LEDController LED(LED_PIN);
 LEDController BUZZER(BUZZER_PIN);
 Timer t;
+
 
 //Appends current activity level to the array
 void sumActivity() {
@@ -51,7 +51,10 @@ void sumActivity() {
   Serial.println(INTENSITY);
 }
 
+
 //Averages the array and checks if the level of activity is sufficient
+// * If so, changes to sitting mode and starts the cycle all over
+// * If not, activates the alarm again and gives the user another chance of reaching the activity level
 void checkActivity() {
   
   int ACTIVITY_ARRAY_SUM = 0;
@@ -59,8 +62,6 @@ void checkActivity() {
   for (int i=0; i < ACTIVITY_ARRAY_SIZE; i++) { ACTIVITY_ARRAY_SUM = ACTIVITY_ARRAY_SUM + ACTIVITY_ARRAY[i]; }
   int ACTIVITY_ARRAY_AVERAGE = ACTIVITY_ARRAY_SUM / ACTIVITY_ARRAY_SIZE;
   
-  Serial.println(ACTIVITY_ARRAY_SUM);
-  Serial.println(ACTIVITY_ARRAY_SIZE);
   Serial.print("ACTIVITY AVERAGE = ");
   Serial.println(ACTIVITY_ARRAY_AVERAGE);
   
@@ -71,13 +72,19 @@ void checkActivity() {
   }
 }
 
+
+//Initializes Sitting idle mode
+// * Waits for MAX_SITTING_TIME, usually 30 mins
 void sit() {
   Serial.println("Sitting.");
   SETTING = 0;
   BUZZER.onOff(50); BUZZER.onOff(50); BUZZER.onOff(50); BUZZER.onOff(100);
-  t.after(MAX_SITTING_TIME_SECS*1000, alarm);
+  t.after(MAX_SITTING_TIME*60000, alarm);
 }
 
+
+//Initializes Alarm mode
+// * User must press the button to initialize Walking mode
 void alarm() {
   Serial.println("Alarm!");
   SETTING = 1;
@@ -85,6 +92,10 @@ void alarm() {
   BUZZER.onOff(100);
 }
 
+
+// Initializes Walking mode
+// * Timer set to take a reading of the movement intensity every 2,5 s
+// * Timer set to average and compare the readings to the INTENSITY_THRESHOLD
 void walk() {
   SETTING = 2;
   Serial.println("Walking.");
@@ -142,5 +153,4 @@ void loop() {
       //Serial.println(INTENSITY);
       delay(100);
     }
-
 }
