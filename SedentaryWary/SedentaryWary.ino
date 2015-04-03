@@ -16,29 +16,31 @@
 //  * Input button (PULL_UP) (ex. Pin 2)
 //
 
-#include <LEDController.h>
+#include <LEDController.h> // https://github.com/GrimKriegor/Electronics/tree/master/LEDController
 #include <Wire.h>
 #include <Timer.h>
 
 
 //Configure
-const long INTENSITY_THRESHOLD = 200; // Level of activity to be considered as moderate to vigorous
+const long INTENSITY_THRESHOLD = 250; // Level of activity to be considered as moderate to vigorous
 const int MAX_SITTING_TIME = 30; // Number of minutes the program will wait before setting off the alarm
-const byte LED_PIN = 3; // Info LED pin
+const byte LED_PIN = 5; // Info LED pin
 const byte BUZZER_PIN = 11; // Info Buzzer pin
 const byte BUTTON_PIN = 2; // Button pin
 
 
 //Declare variables
 int INTENSITY; //Intensity is the "mean" of acceleration from the 3 axis
-int SETTING; //This variable selectively enables the appropriate block during loop(), depending on the current state
+int SETTING = 0; //This variable selectively enables the appropriate block during loop(), depending on the current state
 byte READING_NUMBER; //Index number of each reading
 int ACTIVITY_ARRAY[23]; //This array will store all the activity readings during the Walking setting
-const int MPU=0x68;  // I2C address of the MPU-6050
+const int MPU = 0x68;  // I2C address of the MPU-6050
 long AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
 LEDController LED(LED_PIN);
 LEDController BUZZER(BUZZER_PIN);
-Timer t;
+Timer timer;
+Timer timer2;
+boolean SOUND = true;
 
 
 //Appends current activity level to the array
@@ -72,6 +74,12 @@ void checkActivity() {
   }
 }
 
+// Disables the alarm sound
+void alarmTimeout() {
+  Serial.println("ALARM TIMEOUT");
+  if (SETTING == 1) { SOUND = false; }
+}
+
 
 //Initializes Sitting idle mode
 // * Waits for MAX_SITTING_TIME, usually 30 mins
@@ -79,7 +87,7 @@ void sit() {
   Serial.println("Sitting.");
   SETTING = 0;
   BUZZER.onOff(50); BUZZER.onOff(50); BUZZER.onOff(50); BUZZER.onOff(100);
-  t.after(MAX_SITTING_TIME*60000, alarm);
+  timer.after(MAX_SITTING_TIME*60000, alarm);
 }
 
 
@@ -88,8 +96,11 @@ void sit() {
 void alarm() {
   Serial.println("Alarm!");
   SETTING = 1;
+  SOUND = true;
   LED.onOff(100);
   BUZZER.onOff(100);
+  delay(1000);
+  timer2.after(10000, alarmTimeout);
 }
 
 
@@ -100,8 +111,8 @@ void walk() {
   SETTING = 2;
   Serial.println("Walking.");
   READING_NUMBER = 0;
-  t.every(2500, sumActivity, 23);
-  t.after(60100, checkActivity);
+  timer.every(2500, sumActivity, 23);
+  timer.after(60100, checkActivity);
   BUZZER.onOff(100); BUZZER.onOff(200);
 }
   
@@ -122,7 +133,8 @@ void setup() {
 
 void loop() {
   
-    t.update();
+    timer.update();
+    timer2.update();
   
     if (SETTING == 0) {
       LED.cycleDim(1000,0,20);
@@ -130,7 +142,7 @@ void loop() {
   
     if (SETTING == 1) {
       if (! digitalRead(2)) { walk(); }
-      BUZZER.onOff(100);
+      if (SOUND == true) { BUZZER.onOff(100); }
       LED.onOff(100);
     }
     
@@ -148,9 +160,9 @@ void loop() {
       GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
       
       INTENSITY = (labs(GyX)+labs(GyY)+labs(GyZ))/100;
+      Serial.println(INTENSITY);
 
       LED.dim(map(INTENSITY,10,500,0,100));
-      //Serial.println(INTENSITY);
       delay(100);
     }
 }
