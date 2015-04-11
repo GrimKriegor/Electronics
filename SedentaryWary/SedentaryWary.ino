@@ -17,36 +17,63 @@
 //
 
 #include <LEDController.h> // https://github.com/GrimKriegor/Electronics/tree/master/LEDController
-#include <Wire.h>
-#include <Timer.h>
+#include <Wire.h>          // http://arduino.cc/en/Reference/Wire
+#include <Timer.h>         // http://playground.arduino.cc/Code/Timer
 
 
 //Configure
-const long INTENSITY_THRESHOLD = 250; // Level of activity to be considered as moderate to vigorous
-const int SITTING_TIME = 30; // Number of minutes the program will wait before setting off the alarm
-const int WALKING_TIME = 1; // Minutes walking
-const int ALARM_TIMEOUT = 10; //Seconds till alarm timeout
-
 const byte LED_PIN = 5; // Info LED pin
 const byte BUZZER_PIN = 11; // Info Buzzer pin
 const byte BUTTON_PIN = 2; // Button pin
+const int MPU = 0x68;  // I2C address of the MPU-6050
+
+const byte DIP[] = {}; //Config
+
+
+// INTENSITY_THRESHOLD, SITTING_TIME, WALKING_TIME, ALARM_TIMEOUT
+const int configSettings[5][4] = {
+  {200, 1, 5, 5}, //Debug Mode
+  {250, 30, 1, 10}, //Normal setting
+  {200, 30, 2, 20}, //Super Supreeme
+  {100, 30, 3, 10},
+  {0, 0, 0, 0}
+};
+int INTENSITY_THRESHOLD; // Level of activity to be considered as moderate to vigorous
+int SITTING_TIME; // Number of minutes the program will wait before setting off the alarm
+int WALKING_TIME; // Minutes walking
+int ALARM_TIMEOUT;  //Seconds till alarm timeout
 
 
 //Declare variables
 int INTENSITY; //Intensity is the "mean" of acceleration from the 3 axis
-int STAGE = 0; //This variable selectively enables the appropriate block during loop(), depending on the current state
+int STAGE; //This variable selectively enables the appropriate block during loop(), depending on the current state
 byte READING_NUMBER; //Index number of each reading
-int ACTIVITY_ARRAY[(WALKING_TIME*60)/2]; //This array will store all the activity readings during the Walking setting
-const int MPU = 0x68;  // I2C address of the MPU-6050
-long AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
+boolean SOUND = true;
+int ACTIVITY_ARRAY[150]; //This array will store all the activity readings during the Walking setting, 5 min max
+long AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ; //Raw values from the MPU-6050
 LEDController LED(LED_PIN);
 LEDController BUZZER(BUZZER_PIN);
 Timer timer;
 Timer timer_aux;
-boolean SOUND = true;
 
 
-//Appends current activity level to the array
+
+
+//Checks the DIP switches, sets the SETTING and assigns the variables... WIP
+void initConfigure() {
+  
+  byte SETTING = 1;
+  
+  INTENSITY_THRESHOLD = configSettings[SETTING][0]; 
+  SITTING_TIME = configSettings[SETTING][1];
+  WALKING_TIME = configSettings[SETTING][2]; 
+  ALARM_TIMEOUT = configSettings[SETTING][3];
+  
+  sit(); //Initialize the cycle
+}
+
+
+//Appends current activity level to the ACTIVITY_ARRAY[]
 void sumActivity() {
   
   ACTIVITY_ARRAY[READING_NUMBER] = labs(INTENSITY);
@@ -57,15 +84,16 @@ void sumActivity() {
 }
 
 
-//Averages the array and checks if the level of activity is sufficient
+//Averages the ACTIVITY_ARRAY[] and checks if the level of activity is sufficient (>= INTENSITY_THRESHOLD)
 // * If so, changes to sitting mode and starts the cycle all over
 // * If not, activates the alarm again and gives the user another chance of reaching the activity level
 void checkActivity() {
   
   int ACTIVITY_ARRAY_SUM = 0;
+  int ACTIVITY_ARRAY_READINGS = (WALKING_TIME*60)/2;
   int ACTIVITY_ARRAY_SIZE = sizeof(ACTIVITY_ARRAY) / sizeof(int);
   for (int i=0; i < ACTIVITY_ARRAY_SIZE; i++) { ACTIVITY_ARRAY_SUM = ACTIVITY_ARRAY_SUM + ACTIVITY_ARRAY[i]; }
-  int ACTIVITY_ARRAY_AVERAGE = ACTIVITY_ARRAY_SUM / ACTIVITY_ARRAY_SIZE;
+  int ACTIVITY_ARRAY_AVERAGE = ACTIVITY_ARRAY_SUM / ACTIVITY_ARRAY_READINGS;
   
   Serial.print("Average = ");
   Serial.println(ACTIVITY_ARRAY_AVERAGE);
@@ -74,10 +102,11 @@ void checkActivity() {
     Serial.println("WELL DONE!");
     sit();
   } else {
-    Serial.println("U DUN GOOFED! TRY AGAIN!!");
+    Serial.println("INSUFICIENT ACTIVITY AVERAGE, PLEASE TRY AGAIN!");
     alarm();
   }
 }
+
 
 // Disables the alarm sound
 void alarmTimeout() {
@@ -116,12 +145,15 @@ void alarm() {
 void walk() {
   STAGE = 2;
   Serial.println("-- Walking Stage --");
+  Serial.print("Please exercise during the next "); Serial.print(WALKING_TIME); Serial.println(" minutes.");
   READING_NUMBER = 0;
   timer.every(2000, sumActivity, (WALKING_TIME*60)/2);
-  timer.after(WALKING_TIME*60000+2000, checkActivity);
+  timer.after(WALKING_TIME*60000+3000, checkActivity);
   BUZZER.onOff(100); BUZZER.onOff(200);
 }
-  
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
   Wire.begin();
@@ -133,7 +165,7 @@ void setup() {
   Serial.begin(9600);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   
-  sit();
+  initConfigure();
 }
 
 
@@ -143,7 +175,8 @@ void loop() {
     timer_aux.update();
   
     if (STAGE == 0) {
-      LED.cycleDim(1000,0,20);
+      LED.cycleDim(1000,0,10);
+      delay(5000);
     }
   
     if (STAGE == 1) {
@@ -166,9 +199,8 @@ void loop() {
       GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
       
       INTENSITY = (labs(GyX)+labs(GyY)+labs(GyZ))/100;
-      //Serial.println(INTENSITY);
 
       LED.dim(map(INTENSITY,10,500,0,100));
-      delay(100);
+      delay(500);
     }
 }
