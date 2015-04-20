@@ -23,20 +23,20 @@
 
 //Configure
 const byte LED_PIN = 5; // Info LED pin
-const byte BUZZER_PIN = 11; // Info Buzzer pin
+const byte BUZZER_PIN = 3; // Info Buzzer pin
 const byte BUTTON_PIN = 2; // Button pin
 const int MPU = 0x68;  // I2C address of the MPU-6050
-
-const byte DIP[] = {}; //Config
+const byte DIP[] = {12, 11, 10}; //Config DIP Input
+const boolean CONFIGURABLE = 1;
 
 
 // INTENSITY_THRESHOLD, SITTING_TIME, WALKING_TIME, ALARM_TIMEOUT
 const int configSettings[5][4] = {
-  {200, 1, 5, 5}, //Debug Mode
-  {250, 30, 1, 10}, //Normal setting
-  {200, 30, 2, 20}, //Super Supreeme
-  {100, 30, 3, 10},
-  {0, 0, 0, 0}
+  {200, 1, 5, 1}, // 0:: Debug Mode
+  {250, 30, 1, 3}, // 1:: Default Setting
+  {200, 30, 2, 20}, // 2:: High duration, Medium intensity
+  {400, 30, 1, 10}, // 3:: High intensity, Medium duration
+  {400, 60, 2, 10}  // 4:: Lazy Mode
 };
 int INTENSITY_THRESHOLD; // Level of activity to be considered as moderate to vigorous
 int SITTING_TIME; // Number of minutes the program will wait before setting off the alarm
@@ -46,6 +46,7 @@ int ALARM_TIMEOUT;  //Seconds till alarm timeout
 
 //Declare variables
 int INTENSITY; //Intensity is the "mean" of acceleration from the 3 axis
+byte SETTING;
 int STAGE; //This variable selectively enables the appropriate block during loop(), depending on the current state
 byte READING_NUMBER; //Index number of each reading
 boolean SOUND = true;
@@ -62,13 +63,26 @@ Timer timer_aux;
 //Checks the DIP switches, sets the SETTING and assigns the variables... WIP
 void initConfigure() {
   
-  byte SETTING = 1;
+  if (CONFIGURABLE) {
+    String DIP_READ;
+    for (int i=0; i<3; i++) { DIP_READ += !digitalRead(DIP[i]); }
+       
+    if      (DIP_READ == "000") { SETTING = 0; }
+    else if (DIP_READ == "001") { SETTING = 1; }
+    else if (DIP_READ == "010") { SETTING = 2; }
+    else if (DIP_READ == "011") { SETTING = 3; }
+    else if (DIP_READ == "100") { SETTING = 4; }
+    else { SETTING = 1; }
+    
+    Serial.print("Setting: "); Serial.print(SETTING); Serial.print (" || DIP: "); Serial.println(DIP_READ);
+    
+  } else { SETTING = 1; }
   
   INTENSITY_THRESHOLD = configSettings[SETTING][0]; 
   SITTING_TIME = configSettings[SETTING][1];
   WALKING_TIME = configSettings[SETTING][2]; 
   ALARM_TIMEOUT = configSettings[SETTING][3];
-  
+    
   sit(); //Initialize the cycle
 }
 
@@ -165,6 +179,9 @@ void setup() {
   Serial.begin(9600);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   
+  //Set DIP to Input
+  if(CONFIGURABLE) { for(int i=0; i<3; i++) { pinMode(DIP[i], INPUT_PULLUP); } }
+  
   initConfigure();
 }
 
@@ -201,6 +218,6 @@ void loop() {
       INTENSITY = (labs(GyX)+labs(GyY)+labs(GyZ))/100;
 
       LED.dim(map(INTENSITY,10,500,0,100));
-      delay(500);
+      delay(200);
     }
 }
