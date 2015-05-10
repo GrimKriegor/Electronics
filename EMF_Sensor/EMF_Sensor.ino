@@ -16,6 +16,7 @@ int NUMREADINGS = 15;
 int SENSITIVITY = 15;
 byte PROBE_PIN   = A7;
 byte LEDS[] = {12,10,8,6,4,2}; // Replace with LED digital pins
+byte BUZZER = 3;
 
 
 //Initialization
@@ -39,6 +40,10 @@ void setup() {
   //Initialization LED Sequence
   for (int i = 0; i < LEDS_COUNT; i++) { digitalWrite(LEDS[i], HIGH); delay(100); digitalWrite(LEDS[i], LOW); }
   for (int i = LEDS_COUNT; i > 0; i--) { digitalWrite(LEDS[i], HIGH); delay(100); digitalWrite(LEDS[i], LOW); }
+
+  //Initialize BUZZER
+  pinMode(BUZZER, OUTPUT);
+  digitalWrite(BUZZER, HIGH); delay(100); digitalWrite(BUZZER, LOW);
 
   //Initialize Serial for debugging
   Serial.begin(9600);
@@ -74,6 +79,9 @@ void loop() {
     for (int i = 0; i < LEVEL; i++) { digitalWrite(LEDS[i], HIGH); }
     for (int i = 0; i < LEDS_COUNT; i++) { digitalWrite(LEDS[i], LOW); }
 
+    //Ring the BUZZER if activity reaches a certain level (DEFAULT = 4)
+    if (LEVEL > 4) { analogWrite(BUZZER, random(100)w); } 
+    else { analogWrite(BUZZER, 0); }
     
     Serial.println(VALUE);
   }
