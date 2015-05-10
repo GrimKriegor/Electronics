@@ -6,6 +6,7 @@
 //
 // Circuit suggestion:
 // * 6 LED connected to {12,10,8,6,4,2} digital pins via 100 ohm resistors
+// * Buzzer on digital pin 3
 // * Probe connected to analog pin 7
 // * Probe connected to ground via 3 Mohm resistor
 // 
