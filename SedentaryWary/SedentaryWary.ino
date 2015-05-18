@@ -31,12 +31,13 @@ const boolean CONFIGURABLE = 1;
 
 
 // INTENSITY_THRESHOLD, SITTING_TIME, WALKING_TIME, ALARM_TIMEOUT
-const int configSettings[5][4] = {
+const int configSettings[6][4] = {
   {200, 1, 5, 1}, // 0:: Debug Mode
   {250, 30, 1, 3}, // 1:: Default Setting
-  {200, 30, 2, 20}, // 2:: High duration, Medium intensity
-  {400, 30, 1, 10}, // 3:: High intensity, Medium duration
-  {400, 60, 2, 10}  // 4:: Lazy Mode
+  {200, 30, 2, 5}, // 2:: High duration, Medium intensity
+  {400, 30, 1, 5}, // 3:: High intensity, Medium duration
+  {400, 60, 2, 5},  // 4:: Lazy Mode
+  {300, 15, 1, 5}  // 5:: Regular Punishment LOL
 };
 int INTENSITY_THRESHOLD; // Level of activity to be considered as moderate to vigorous
 int SITTING_TIME; // Number of minutes the program will wait before setting off the alarm
@@ -68,10 +69,11 @@ void initConfigure() {
     for (int i=0; i<3; i++) { DIP_READ += !digitalRead(DIP[i]); }
        
     if      (DIP_READ == "000") { SETTING = 0; }
-    else if (DIP_READ == "001") { SETTING = 1; }
+    else if (DIP_READ == "100") { SETTING = 1; }
     else if (DIP_READ == "010") { SETTING = 2; }
-    else if (DIP_READ == "011") { SETTING = 3; }
-    else if (DIP_READ == "100") { SETTING = 4; }
+    else if (DIP_READ == "110") { SETTING = 3; }
+    else if (DIP_READ == "001") { SETTING = 4; }
+    else if (DIP_READ == "011") { SETTING = 5; }
     else { SETTING = 1; }
     
     Serial.print("Setting: "); Serial.print(SETTING); Serial.print (" || DIP: "); Serial.println(DIP_READ);
@@ -181,6 +183,8 @@ void setup() {
   
   //Set DIP to Input
   if(CONFIGURABLE) { for(int i=0; i<3; i++) { pinMode(DIP[i], INPUT_PULLUP); } }
+  
+  Serial.println("--- SedentaryWary :: Initializing ---");
   
   initConfigure();
 }
