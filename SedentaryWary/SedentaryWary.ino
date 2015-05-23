@@ -51,6 +51,7 @@ byte SETTING;
 int STAGE; //This variable selectively enables the appropriate block during loop(), depending on the current state
 byte READING_NUMBER; //Index number of each reading
 boolean SOUND = true;
+boolean BUTTONHOLD = false;
 int ACTIVITY_ARRAY[150]; //This array will store all the activity readings during the Walking setting, 5 min max
 long AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ; //Raw values from the MPU-6050
 LEDController LED(LED_PIN);
@@ -168,6 +169,15 @@ void walk() {
   BUZZER.onOff(100); BUZZER.onOff(200);
 }
 
+//Checks if the button is being hold during Waiting mode, if so, goes directly to Alarm mode
+void checkHoldButton() {
+  if ( !digitalRead(BUTTON_PIN) ) { 
+    BUTTONHOLD = false; 
+    Serial.println("WAITING MODE OVERRIDE");
+    alarm();
+  } 
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -197,11 +207,18 @@ void loop() {
   
     if (STAGE == 0) {
       LED.cycleDim(1000,0,10);
-      delay(5000);
+      delay(1000);
+      
+      if (!BUTTONHOLD && !digitalRead(BUTTON_PIN)) { 
+        Serial.println("BUTTON PRESSED");
+        BUZZER.onOff(50);
+        BUTTONHOLD = true; 
+        timer_aux.after(5000, checkHoldButton); 
+      }
     }
   
     if (STAGE == 1) {
-      if (! digitalRead(2)) { walk(); }
+      if (! digitalRead(BUTTON_PIN)) { walk(); }
       if (SOUND == true) { BUZZER.onOff(100); }
       LED.onOff(100);
     }
