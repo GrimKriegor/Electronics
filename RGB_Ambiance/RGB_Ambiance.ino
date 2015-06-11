@@ -53,22 +53,26 @@ void loop() {
   
   if (MODE == 1) {
     for (int i; i<3; i++) {
-//      unsigned int SPEED = map(analogRead(POTENTIOMETER), 0, 1023, 500, 10000);
-//      COLORS[i].cycleDim(SPEED);
       
       for (int j=0; j<100; j++) { 
         unsigned int SPEED = map(analogRead(POTENTIOMETER), 0, 1023, 1, 100);
         COLORS[i].dim(j);
         delay(SPEED);
       }
+      
       for (int j=100; j>0; j--) { 
         unsigned int SPEED = map(analogRead(POTENTIOMETER), 0, 1023, 1, 100);
         COLORS[i].dim(j);
         delay(SPEED);
       }
+      
     }
   }
   
-  if (!digitalRead(BUTTONS_RGB[0]) and !digitalRead(BUTTONS_RGB[2])) { MODE = 1; }
+  if (!digitalRead(BUTTONS_RGB[0]) and !digitalRead(BUTTONS_RGB[2])) { 
+    delay(2000);
+    if      (MODE == 0) { MODE = 1; }
+    else if (MODE == 1) { MODE = 0; }
+  }
 
 }
