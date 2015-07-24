@@ -1,15 +1,28 @@
-//
-// :: FoodDispenser ::
-// My father needed a chicken feeder so he wouldn't need to drive everyday to feed...
-// 
-// 
-//
-// Grim Kriegor <grimkriegor@opmbx.org>
-//
-//
-// Circuit suggestion:
-//  * 
-//
+/*
+
+ :: FoodDispenser ::
+ Version 0.1.0 PRE-ALPHA - Licenced under GPLv3
+ 
+ Grim Kriegor <grimkriegor@opmbx.org>
+ https://github.com/GrimKriegor/Electronics/
+
+>>
+ A memento for my dad's 50th birthday (July 2015)
+  *May his little dinossaur chicken be extra fat and strong 
+   with regular daily food dispensings
+ Feliz aniversario pai, és o maior!
+>>
+
+ Main components:
+  * ATMega8 microcontroller
+  * 12VDC motor
+  * 1 rocker switch for main power
+  * 2 pull up buttons for DISPENSE and SKIP
+  * 2 linear potentiometers for QUANTITY and TIME
+  * 2 indicator LED
+  * ...
+
+*/
 
 #include <Wire.h>
 #include <Time.h>
@@ -25,7 +38,7 @@ const boolean      CONFIG_TIME_OF_SERVING = true;
 const byte         CONFIG_TIME_OF_SERVING_HOURS[] = { 8, 10, 12, 14, 16 };
 
 //Peripheral configuration
-byte FEEDER = 2;
+byte DISPENSER = 2;
 byte BUTTON_SERVE = 8;
 byte BUTTON_SKIP = 9;
 byte DIAL_QUANTITY = A0;
@@ -37,7 +50,6 @@ byte ERROR_ALERT;
 volatile boolean SERVED;
 volatile byte QUANTITY;
 volatile byte TIME_OF_SERVING;
-
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,8 +67,8 @@ byte memory(char _OPERATION, byte _DATA=day()) {
 }
 
 
-/* serve() delivers food thru the FEEDER peripheral
- * QUANTITY, defined by defineServingQuantity() is just the duration the FEEDER stays active.
+/* serve() delivers food thru the DISPENSER peripheral
+ * QUANTITY, defined by defineServingQuantity() is just the duration the DISPENSER stays active.
  * After each serving, SERVED becomes true and the current day is written to the EEPROM.
  */
 void serve() {
@@ -64,9 +76,9 @@ void serve() {
   defineServingQuantity();
   
   //Open feeding valve for QUANTITY seconds
-  digitalWrite(FEEDER, HIGH);
+  digitalWrite(DISPENSER, HIGH);
   delay(QUANTITY*1000);
-  digitalWrite(FEEDER, LOW);
+  digitalWrite(DISPENSER, LOW);
 
   //Define SERVED as true and write to EEPROM "month()" address
   SERVED = true;
@@ -101,11 +113,11 @@ void defineServingQuantity() {
 void defineServingTime() {
   if (CONFIG_TIME_OF_SERVING) {
     unsigned int _VALUE = analogRead(DIAL_TIME);
-    if      (_VALUE < 300)                 { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[0]; }
-    else if (_VALUE > 300 && _VALUE < 400) { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[1]; }
-    else if (_VALUE > 300 && _VALUE < 400) { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[2]; }
-    else if (_VALUE > 300 && _VALUE < 400) { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[3]; }
-    else if (_VALUE > 500)                 { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[4]; }
+    if      (_VALUE <= 200)                 { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[0]; }
+    else if (_VALUE > 200 && _VALUE <= 400) { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[1]; }
+    else if (_VALUE > 400 && _VALUE <= 600) { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[2]; }
+    else if (_VALUE > 600 && _VALUE <= 800) { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[3]; }
+    else if (_VALUE > 800)                  { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[4]; }
   } else { TIME_OF_SERVING = CONFIG_TIME_OF_SERVING_HOURS[0]; }
 }
 
@@ -122,14 +134,13 @@ byte checkError() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
 void setup() {
   /* Initialize Serial and Clock communication */
   if (DEBUG) Serial.begin(9600);
   setSyncProvider(RTC.get);
 
   /* Peripheral pin modes */
-  pinMode(FEEDER, OUTPUT);
+  pinMode(DISPENSER, OUTPUT);
   pinMode(BUTTON_SERVE, INPUT_PULLUP);
   pinMode(BUTTON_SKIP, INPUT_PULLUP);
   pinMode(DIAL_QUANTITY, INPUT);
@@ -148,7 +159,6 @@ void setup() {
     if (DEBUG) Serial.println("Daily serving awaiting.");
   }
 }
-
 
 
 void loop() {
