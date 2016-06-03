@@ -3,7 +3,10 @@
 #include <CapacitiveSensor.h> // https://github.com/PaulStoffregen/CapacitiveSensor
 #include <LowPower.h>         // https://github.com/rocketscream/Low-Power
 
-
+/*
+ * CONFIGURATION
+ */
+ 
 //DEBUG MODE
 const boolean DEBUG = true;
 
@@ -34,24 +37,30 @@ int COLORS[NUMBER_OF_COLORS][3] = {
 };
 
 
+/*
+ * DECLARATIONS
+ */
 
-//
+//Objects
 LEDController LED_RED(LED_PIN_RED);
 LEDController LED_GREEN(LED_PIN_GREEN);
 LEDController LED_BLUE(LED_PIN_BLUE);
-
 CapacitiveSensor TOUCH_SENSOR(TOUCH_PIN_SENDER, TOUCH_PIN_RECEIVER);
 
-//
-int COLOR_PREVIOUS_RED = 0;
-int COLOR_PREVIOUS_GREEN = 0;
-int COLOR_PREVIOUS_BLUE = 0;
-int VALUE_RED = 0;
-int VALUE_GREEN = 0;
-int VALUE_BLUE = 0;
-
-uint8_t STAGE = 0;
+//Color information storage
+int COLOR_PREVIOUS_RED;
+int COLOR_PREVIOUS_GREEN;
+int COLOR_PREVIOUS_BLUE;
+int COLOR_RANDOM_RED;
+int COLOR_RANDOM_GREEN;
+int COLOR_RANDOM_BLUE;
+int VALUE_RED;
+int VALUE_GREEN;
+int VALUE_BLUE;
 unsigned int CROSSFADE_TIME = 2000;
+
+//Machine state storage
+uint8_t STAGE = 0;
 
 
 
@@ -120,7 +129,7 @@ int calcColorValue(int STEP, int VALUE, int i) {
   return VALUE;
 }
 
-void crossfadeColor(int COLOR_TARGET_RED, int COLOR_TARGET_GREEN, int COLOR_TARGET_BLUE) {
+void crossfadeColor(int COLOR_TARGET_RED=COLOR_RANDOM_RED, int COLOR_TARGET_GREEN=COLOR_RANDOM_GREEN, int COLOR_TARGET_BLUE=COLOR_RANDOM_BLUE) {
 
   if (DEBUG) {
     Serial.print("Fading from ");
@@ -172,6 +181,10 @@ void dimColor(boolean DIM, int MULTIPLIER) {
   COLOR_DIM_GREEN = boundColorValue(COLOR_DIM_GREEN);
   COLOR_DIM_BLUE = boundColorValue(COLOR_DIM_BLUE);
 
+  if (DEBUG) {
+    Serial.print("Dimming down: "); Serial.print(DIM); Serial.print(" || Multiplier: "); Serial.println(MULTIPLIER);
+  }
+
   crossfadeColor(COLOR_DIM_RED, COLOR_DIM_GREEN, COLOR_DIM_BLUE);
 }
 
@@ -182,6 +195,23 @@ int boundColorValue(int VALUE) {
   return VALUE;
 }
 
+void randomizeColor(boolean PURE=true) {
+  if (PURE) {
+    int RANDOM = random(NUMBER_OF_COLORS);
+    COLOR_RANDOM_RED = COLORS[RANDOM][0];
+    COLOR_RANDOM_GREEN = COLORS[RANDOM][1];
+    COLOR_RANDOM_BLUE = COLORS[RANDOM][2];
+  } else {
+    COLOR_RANDOM_RED = random(0,255);
+    COLOR_RANDOM_GREEN = random(0,255);
+    COLOR_RANDOM_BLUE = random(0,255);
+  }
+}
+
+void randomizeColorCrossfadeTime(int MIN=500, int MAX=3000) {
+  CROSSFADE_TIME = random(MIN,MAX);
+}
+
 
 void setup() {
   Wire.begin();
@@ -190,14 +220,14 @@ void setup() {
   Wire.write(0);     // set to zero (wakes up the MPU-6050)
   Wire.endTransmission(true);
 
-  Serial.begin(9600);
+  if (DEBUG) { Serial.begin(9600); }
 }
 
 
 void loop() {
 
   if (DEBUG) {
-    Serial.print("Stage: "); Serial.print(STAGE); 
+    Serial.print(">> Stage: "); Serial.print(STAGE); 
     Serial.print(" || Touch: "); Serial.print(readTouch()); Serial.print(" - "); Serial.print(readTouchProximity()); 
     Serial.print(" || Movement: "); Serial.println(readMovementSpeed());
   }
@@ -205,7 +235,9 @@ void loop() {
   //OFF Stage
   // Read touch
   if ( STAGE == 0 ) {
-    //LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
+    if (!DEBUG) { LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF); } 
+    else { delay(1000); }
+    
     LED_BLUE.off();
     if (readTouch()) { STAGE = 1; }
   }
@@ -227,7 +259,7 @@ void loop() {
     while(readTouchProximity() < 20000) {
       LED_BLUE.dim(map(readTouchProximity(),100,15000,1,255));
     }
-    STAGE = 0;
+    STAGE = 99;
   }
 
   //MUTATION Stage
@@ -242,16 +274,10 @@ void loop() {
 
   //
   else {
-    crossfadeColor(random(255),random(255),random(255));
-    crossfadeColor(0,0,255);
-    crossfadeColor(0,0,60);
-    CROSSFADE_TIME = random(100,2000);
-    uint8_t RANDOMCOLOR = random(0, NUMBER_OF_COLORS);
-    crossfadeColor(COLORS[RANDOMCOLOR][0],COLORS[RANDOMCOLOR][1],COLORS[RANDOMCOLOR][2]);
-    CROSSFADE_TIME=5000;
-    crossfadeColor(255,0,0);
-    crossfadeColor(0,255,0);
-    crossfadeColor(0,0,255);
+  randomizeColor(true);
+  crossfadeColor();
+  randomizeColorCrossfadeTime(1000);
+  dimColor(true,4);
   }
 
   
