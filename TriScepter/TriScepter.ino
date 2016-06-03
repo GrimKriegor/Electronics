@@ -1,3 +1,18 @@
+//
+// :: TriScepter ::
+//
+// * Software that defines the super evil Tri Scepter's behaviour
+// * May it instill the spoops and the creeps in the hearts of your enemies
+//
+// Grim Kriegor <grimkriegor@krutt.org>
+//
+//
+// Circuit suggestion:
+//  * RGB Led on pins 3,5 and 6.
+//  * Pin 10 connected to pin 9 through a 10M ohm resistor, probe connected to pin 9
+//  * MPU-6050 connected via I2C (SCL, SDA - A4, A5)
+//
+
 #include <LEDController.h>    // https://github.com/GrimKriegor/Electronics/tree/master/LEDController
 #include <Wire.h>             // http://arduino.cc/en/Reference/Wire
 #include <CapacitiveSensor.h> // https://github.com/PaulStoffregen/CapacitiveSensor
@@ -8,7 +23,7 @@
  */
  
 //DEBUG MODE
-const boolean DEBUG = false;
+const boolean DEBUG = true; //If true will print debug information to the serial console
 
 //LEDS
 const uint8_t LED_PIN_RED = 3;
@@ -17,14 +32,14 @@ const uint8_t LED_PIN_BLUE = 6;
 
 //TOUCH SENSOR
 const uint8_t TOUCH_PIN_SENDER = 10;
-const uint8_t TOUCH_PIN_RECEIVER = 9;
+const uint8_t TOUCH_PIN_RECEIVER = 9; //Probe connects to the TOUCH_PIN_RECEIVER
 const unsigned int TOUCH_THRESHOLD = 20000;
 
 //ACCELEROMETER
 const int ACCELEROMETER_ADDRESS = 0x68;  // I2C address of the MPU-6050
 const int MOVEMENT_THRESHOLD = 20;
-const int MOVEMENT_ARRAY_READINGS = 60;
-const int SPIKE_LEVEL = 50;
+const int MOVEMENT_ARRAY_READINGS = 10;
+const int SPIKE_LEVEL = 300;
 
 //COLORS
 const uint8_t NUMBER_OF_COLORS = 7;
@@ -38,6 +53,8 @@ int COLORS[NUMBER_OF_COLORS][3] = {
   {0,255,255}      //Aqua
 };
 
+//STATE
+const uint32_t TIMEOUT = 30000;
 
 /*
  * DECLARATIONS
@@ -67,8 +84,8 @@ int MOVEMENT_ARRAY_PERIOD = MOVEMENT_ARRAY_READINGS / 60 * 1000;
 int MOVEMENT_ARRAY_READING = 0;
 
 //Process information storage
-uint8_t STAGE = 3;
-
+uint8_t STAGE = 0;
+uint32_t TIMEOUT_COUNT = 0;
 
 
 /*
@@ -119,7 +136,7 @@ unsigned int readMovementSpeed() {
 //Adds a new reading to the MOVEMENT_ARRAY
 void sumMovement() {
   MOVEMENT_ARRAY[MOVEMENT_ARRAY_READING] = readMovementSpeed();
-  MOVEMENT_ARRAY_READING++;
+  MOVEMENT_ARRAY_READING = (MOVEMENT_ARRAY_READING + 1) % MOVEMENT_ARRAY_READINGS;
 }
 
 //Goes through the MOVEMENT_ARRAY and returns the average
@@ -131,7 +148,8 @@ int averageMovement() {
     MOVEMENT_ARRAY_SUM = MOVEMENT_ARRAY_SUM + MOVEMENT_ARRAY[i];
   }
   MOVEMENT_ARRAY_AVERAGE = MOVEMENT_ARRAY_SUM / MOVEMENT_ARRAY_READINGS;
-  
+
+  Serial.println(MOVEMENT_ARRAY_AVERAGE);
   return MOVEMENT_ARRAY_AVERAGE;
 }
 
@@ -139,10 +157,12 @@ int averageMovement() {
 boolean checkSpikeMovement() {
   boolean SPIKE = false;
   for (int i=0; i<MOVEMENT_ARRAY_READINGS; i++) {
+    //Serial.println(MOVEMENT_ARRAY[i]);
     if (MOVEMENT_ARRAY[i] >= SPIKE_LEVEL) {
       SPIKE = true;
     }
   }
+
   return SPIKE;
 }
 
@@ -167,15 +187,12 @@ int calcColorValue(int STEP, int VALUE, int i) {
   }
 
   //Keeping it within 0-255
-  //if (VALUE > 255) { VALUE = 255; }
-  //else if (VALUE < 0) { VALUE = 0; }
   VALUE = boundColorValue(VALUE);
 
   return VALUE;
 }
 
 void crossfadeColor(int COLOR_TARGET_RED=COLOR_RANDOM_RED, int COLOR_TARGET_GREEN=COLOR_RANDOM_GREEN, int COLOR_TARGET_BLUE=COLOR_RANDOM_BLUE) {
-
   if (DEBUG) {
     Serial.print("Fading from ");
     Serial.print(COLOR_PREVIOUS_RED); Serial.print(" "); Serial.print(COLOR_PREVIOUS_GREEN); Serial.print(" "); Serial.print(COLOR_PREVIOUS_BLUE);
@@ -206,7 +223,6 @@ void crossfadeColor(int COLOR_TARGET_RED=COLOR_RANDOM_RED, int COLOR_TARGET_GREE
 
 //Reduces or increasces (DIM) color strength by dividing or multiplying each LED's duty cycle by MULTIPLIER
 void dimColor(boolean DIM, int MULTIPLIER) {
-
   int COLOR_DIM_RED;
   int COLOR_DIM_GREEN;
   int COLOR_DIM_BLUE;
@@ -226,9 +242,7 @@ void dimColor(boolean DIM, int MULTIPLIER) {
   COLOR_DIM_GREEN = boundColorValue(COLOR_DIM_GREEN);
   COLOR_DIM_BLUE = boundColorValue(COLOR_DIM_BLUE);
 
-  if (DEBUG) {
-    Serial.print("Dimming down: "); Serial.print(DIM); Serial.print(" || Multiplier: "); Serial.println(MULTIPLIER);
-  }
+  if (DEBUG) { Serial.print("Dimming down: "); Serial.print(DIM); Serial.print(" || Multiplier: "); Serial.println(MULTIPLIER); }
 
   crossfadeColor(COLOR_DIM_RED, COLOR_DIM_GREEN, COLOR_DIM_BLUE);
 }
@@ -260,28 +274,33 @@ void randomizeColorCrossfadeTime(int MIN=500, int MAX=3000) {
   CROSSFADE_TIME = random(MIN,MAX);
 }
 
+/*
+ * RUN
+ */
 
 void setup() {
+  //Initializes communication with the MCU-6050
   Wire.begin();
   Wire.beginTransmission(ACCELEROMETER_ADDRESS);
   Wire.write(0x6B);  // PWR_MGMT_1 register
   Wire.write(0);     // set to zero (wakes up the MPU-6050)
   Wire.endTransmission(true);
 
+  //Initializes the serial console if DEBUG mode is on
   if (DEBUG) { Serial.begin(9600); }
 }
 
 
 void loop() {
 
+  //General debug information, State, Touch and Movement sensor readings
   if (DEBUG) {
     Serial.print(">> Stage: "); Serial.print(STAGE); 
     Serial.print(" || Touch: "); Serial.print(readTouch()); Serial.print(" - "); Serial.print(readTouchProximity()); 
     Serial.print(" || Movement: "); Serial.println(readMovementSpeed());
   }
 
-  //OFF Stage
-  // Read touch
+  //> SLEEP Stage
   if ( STAGE == 0 ) {
     if (!DEBUG) { LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF); } 
     else { delay(1000); }
@@ -290,42 +309,58 @@ void loop() {
     if (readTouch()) { STAGE = 1; }
   }
 
-  //GLOW IN Stage
+  //> GLOW IN Stage
   else if ( STAGE == 1 ) {
-    CROSSFADE_TIME = 5000;
-    crossfadeColor(255,255,255);
-    CROSSFADE_TIME=500;
-    crossfadeColor(255,0,0);
-    crossfadeColor(0,255,0);
-    crossfadeColor(0,0,255);
+    for (int i=0; i < NUMBER_OF_COLORS; i++) {
+      randomizeColor();
+      randomizeColorCrossfadeTime();
+      crossfadeColor();
+    }
     crossfadeColor(0,0,0);
     STAGE = 2;
   }
 
-  //PULSING Stage
+  //> PULSING Stage
   else if ( STAGE == 2 ) {
     while(readTouchProximity() < TOUCH_THRESHOLD) {
       LED_BLUE.dim(map(readTouchProximity(),100,TOUCH_THRESHOLD*0.75,1,255));
     }
-    STAGE = 99;
+    TIMEOUT_COUNT = millis();
+    STAGE = 3;
   }
 
-  //MUTATION Stage
+  //> MUTATION Stage
   else if ( STAGE == 3 ) {
-    //CROSSFADE_TIME = map(readMovementSpeed(),9,1000,1000,100);
-    //randomizeColor(true);
-    //crossfadeColor();
-    int MOVEMENT_SPEED = map(readMovementSpeed(),9,300,0,255);
-    LED_RED.dim(boundColorValue(MOVEMENT_SPEED+64));
-    LED_GREEN.dim(255-MOVEMENT_SPEED);
-  }
-
-  //GLOW OFF Stage
-  else if ( STAGE == 4 ) {
+    sumMovement();
+    delay(100);
+    averageMovement();
     
+    if ( checkSpikeMovement() ) {
+      crossfadeColor(255,0,0);
+      //randomizeColorCrossfadeTime();
+    } else {
+      CROSSFADE_TIME = map(averageMovement(),9,100,2000,100);
+      dimColor(true,2);
+      sumMovement();
+      dimColor(true,2);
+      crossfadeColor(0,0,255);
+    }
+
+     if ( averageMovement() < 10 && millis() > TIMEOUT_COUNT + TIMEOUT ) {
+      STAGE = 4;
+     } else {
+      
+     }
   }
 
-  //
+  //> GLOW OFF Stage
+  else if ( STAGE == 4 ) {
+    crossfadeColor(255,255,255);
+    crossfadeColor(0,0,0);
+    STAGE = 0;
+  }
+
+  //> DEBUG Stage
   else {
   randomizeColor(true);
   crossfadeColor();
