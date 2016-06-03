@@ -8,7 +8,7 @@
  */
  
 //DEBUG MODE
-const boolean DEBUG = true;
+const boolean DEBUG = false;
 
 //LEDS
 const uint8_t LED_PIN_RED = 3;
@@ -17,12 +17,13 @@ const uint8_t LED_PIN_BLUE = 6;
 
 //TOUCH SENSOR
 const uint8_t TOUCH_PIN_SENDER = 10;
-const uint8_t TOUCH_PIN_RECEIVER = 8;
+const uint8_t TOUCH_PIN_RECEIVER = 9;
 const unsigned int TOUCH_THRESHOLD = 20000;
 
 //ACCELEROMETER
 const int ACCELEROMETER_ADDRESS = 0x68;  // I2C address of the MPU-6050
 const int MOVEMENT_THRESHOLD = 20;
+const int MOVEMENT_ARRAY_READINGS = 60;
 
 //COLORS
 const uint8_t NUMBER_OF_COLORS = 7;
@@ -59,8 +60,14 @@ int VALUE_GREEN;
 int VALUE_BLUE;
 unsigned int CROSSFADE_TIME = 2000;
 
+//
+int MOVEMENT_ARRAY[MOVEMENT_ARRAY_READINGS];
+int MOVEMENT_ARRAY_PERIOD = MOVEMENT_ARRAY_READINGS / 60 * 1000;
+int MOVEMENT_ARRAY_READING = 0;
+
+
 //Machine state storage
-uint8_t STAGE = 0;
+uint8_t STAGE = 3;
 
 
 
@@ -103,6 +110,24 @@ unsigned int readMovementSpeed() {
   SPEED = (labs(GyX)+labs(GyY)+labs(GyZ))/100;
   return SPEED;
 }
+
+void sumMovement() {
+  MOVEMENT_ARRAY[MOVEMENT_ARRAY_READING] = readMovementSpeed();
+  MOVEMENT_ARRAY_READING++;
+}
+
+int averageMovement() {
+  int MOVEMENT_ARRAY_SUM = 0;
+  int MOVEMENT_ARRAY_AVERAGE = 0;
+  
+  for (int i=0; i<MOVEMENT_ARRAY_READINGS; i++) {
+    MOVEMENT_ARRAY_SUM = MOVEMENT_ARRAY_SUM + MOVEMENT_ARRAY[i];
+  }
+  MOVEMENT_ARRAY_AVERAGE = MOVEMENT_ARRAY_SUM / MOVEMENT_ARRAY_READINGS;
+  
+  return MOVEMENT_ARRAY_AVERAGE;
+}
+
 
 /*
  * LED COLOR
@@ -256,15 +281,20 @@ void loop() {
 
   //PULSING Stage
   else if ( STAGE == 2 ) {
-    while(readTouchProximity() < 20000) {
-      LED_BLUE.dim(map(readTouchProximity(),100,15000,1,255));
+    while(readTouchProximity() < TOUCH_THRESHOLD) {
+      LED_BLUE.dim(map(readTouchProximity(),100,TOUCH_THRESHOLD*0.75,1,255));
     }
     STAGE = 99;
   }
 
   //MUTATION Stage
   else if ( STAGE == 3 ) {
-    
+    //CROSSFADE_TIME = map(readMovementSpeed(),9,1000,1000,100);
+    //randomizeColor(true);
+    //crossfadeColor();
+    int MOVEMENT_SPEED = map(readMovementSpeed(),9,300,0,255);
+    LED_RED.dim(boundColorValue(MOVEMENT_SPEED+64));
+    LED_GREEN.dim(255-MOVEMENT_SPEED);
   }
 
   //GLOW OFF Stage
@@ -278,6 +308,7 @@ void loop() {
   crossfadeColor();
   randomizeColorCrossfadeTime(1000);
   dimColor(true,4);
+  dimColor(false,4);
   }
 
   
