@@ -24,6 +24,7 @@ const unsigned int TOUCH_THRESHOLD = 20000;
 const int ACCELEROMETER_ADDRESS = 0x68;  // I2C address of the MPU-6050
 const int MOVEMENT_THRESHOLD = 20;
 const int MOVEMENT_ARRAY_READINGS = 60;
+const int SPIKE_LEVEL = 50;
 
 //COLORS
 const uint8_t NUMBER_OF_COLORS = 7;
@@ -60,13 +61,12 @@ int VALUE_GREEN;
 int VALUE_BLUE;
 unsigned int CROSSFADE_TIME = 2000;
 
-//
+//Movement information storage
 int MOVEMENT_ARRAY[MOVEMENT_ARRAY_READINGS];
 int MOVEMENT_ARRAY_PERIOD = MOVEMENT_ARRAY_READINGS / 60 * 1000;
 int MOVEMENT_ARRAY_READING = 0;
 
-
-//Machine state storage
+//Process information storage
 uint8_t STAGE = 3;
 
 
@@ -74,6 +74,8 @@ uint8_t STAGE = 3;
 /*
  * TOUCH SENSOR
  */
+
+//Returns true if there's absolute touch, by comparing the timing of the RC circuit (proximity of the user) to the TOUCH_THRESHOLD
 boolean readTouch() {
   boolean TOUCH = false;
   unsigned int TOUCH_PROXIMITY = 0;
@@ -85,6 +87,7 @@ boolean readTouch() {
   return TOUCH;
 }
 
+//Returns the proximity of the used by reporting the timing of the RC circuit
 unsigned int readTouchProximity() {
   unsigned int TOUCH_PROXIMITY = 0;
   TOUCH_PROXIMITY = TOUCH_SENSOR.capacitiveSensor(30);
@@ -94,6 +97,8 @@ unsigned int readTouchProximity() {
 /*
  * ACCELERATION
  */
+
+//Reads gyroscopic output values for X, Y and Z axis and returns the average.
 unsigned int readMovementSpeed() {
   long GyX,GyY,GyZ;
   int SPEED;
@@ -111,11 +116,13 @@ unsigned int readMovementSpeed() {
   return SPEED;
 }
 
+//Adds a new reading to the MOVEMENT_ARRAY
 void sumMovement() {
   MOVEMENT_ARRAY[MOVEMENT_ARRAY_READING] = readMovementSpeed();
   MOVEMENT_ARRAY_READING++;
 }
 
+//Goes through the MOVEMENT_ARRAY and returns the average
 int averageMovement() {
   int MOVEMENT_ARRAY_SUM = 0;
   int MOVEMENT_ARRAY_AVERAGE = 0;
@@ -128,11 +135,23 @@ int averageMovement() {
   return MOVEMENT_ARRAY_AVERAGE;
 }
 
+//Goes through the MOVEMENT_ARRAY and returns true if one of the values went beyond the SPIKE_LEVEL
+boolean checkSpikeMovement() {
+  boolean SPIKE = false;
+  for (int i=0; i<MOVEMENT_ARRAY_READINGS; i++) {
+    if (MOVEMENT_ARRAY[i] >= SPIKE_LEVEL) {
+      SPIKE = true;
+    }
+  }
+  return SPIKE;
+}
+
 
 /*
  * LED COLOR
  */
 
+//Calculates and returns the STEPs between the current LED duty cycle (color) and the target one
 int calcColorStep(int COLOR_PREVIOUS, int COLOR_TARGET) {
   int STEP = COLOR_TARGET - COLOR_PREVIOUS;
   if (STEP) { STEP = 1020/STEP; }
@@ -140,6 +159,7 @@ int calcColorStep(int COLOR_PREVIOUS, int COLOR_TARGET) {
   return STEP;
 }
 
+//Takes STEP and current color VALUE into account, increascing or decreascing its value depending on the loop count (i)
 int calcColorValue(int STEP, int VALUE, int i) {
   if ((STEP) && i % STEP == 0) {
     if (STEP > 0) { VALUE++; }
@@ -171,7 +191,6 @@ void crossfadeColor(int COLOR_TARGET_RED=COLOR_RANDOM_RED, int COLOR_TARGET_GREE
     VALUE_GREEN = calcColorValue(STEP_GREEN, VALUE_GREEN, i);
     VALUE_BLUE = calcColorValue(STEP_BLUE, VALUE_BLUE, i);
     
-    //Write value to the LEDs
     LED_RED.dim(VALUE_RED);
     LED_GREEN.dim(VALUE_GREEN);
     LED_BLUE.dim(VALUE_BLUE);
@@ -185,6 +204,7 @@ void crossfadeColor(int COLOR_TARGET_RED=COLOR_RANDOM_RED, int COLOR_TARGET_GREE
   COLOR_PREVIOUS_BLUE = VALUE_BLUE;
 }
 
+//Reduces or increasces (DIM) color strength by dividing or multiplying each LED's duty cycle by MULTIPLIER
 void dimColor(boolean DIM, int MULTIPLIER) {
 
   int COLOR_DIM_RED;
@@ -213,6 +233,7 @@ void dimColor(boolean DIM, int MULTIPLIER) {
   crossfadeColor(COLOR_DIM_RED, COLOR_DIM_GREEN, COLOR_DIM_BLUE);
 }
 
+//Processes VALUE and returns a value between 0 and 255
 int boundColorValue(int VALUE) {
   if (VALUE > 255) { VALUE = 255; }
   else if (VALUE < 0) { VALUE = 0; }
@@ -220,6 +241,7 @@ int boundColorValue(int VALUE) {
   return VALUE;
 }
 
+//Picks a random color from the COLORS array (PURE=true) or fabricates a completely random one
 void randomizeColor(boolean PURE=true) {
   if (PURE) {
     int RANDOM = random(NUMBER_OF_COLORS);
@@ -233,6 +255,7 @@ void randomizeColor(boolean PURE=true) {
   }
 }
 
+//Randomizes the time the crossfade takes between MIN and MAX values
 void randomizeColorCrossfadeTime(int MIN=500, int MAX=3000) {
   CROSSFADE_TIME = random(MIN,MAX);
 }
